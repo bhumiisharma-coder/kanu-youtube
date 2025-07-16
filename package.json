@@ -4,8 +4,6 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
-  
-
   },
   "keywords": [],
   "author": "",
@@ -21,6 +19,8 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.16.1",
     "multer": "^2.0.1",
+    "socket": "^1.0.60",
+    "socket.io": "^4.8.1",
     "streamifier": "^0.1.1"
   }
 }
