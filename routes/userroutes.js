@@ -2126,7 +2126,8 @@ const Post = require("../models/post")
 const bcrypt = require("bcryptjs")
 const mongoose = require("mongoose")
 const jwt = require("jsonwebtoken")
-const router = express.Router()
+const router = express.Router();
+const { Course } = require('./server');  // Adjust path as needed
 
 // Middleware to verify JWT token
 const verifyToken = (req, res, next) => {
