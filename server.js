@@ -13894,7 +13894,7 @@ require("dotenv").config()
 
 
 
-const express = require("express")
+// const express = require("express")
 const http = require("http")
 const { Server } = require("socket.io")
 const mongoose = require("mongoose")
@@ -14178,7 +14178,7 @@ mongoose
     const authRoutes = require("./routes/authroutes")
     const postRoutes = require("./routes/postroutes")
     const uploadRoutes = require("./routes/upload")
-    const userRoutes = require("./routes/userroutes").default
+    const userRoutes = require("./routes/userroutes")
 
     app.use("/api/auth", authRoutes)
     app.use("/api/posts", postRoutes)
