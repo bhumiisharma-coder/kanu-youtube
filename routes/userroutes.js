@@ -2857,35 +2857,24 @@
 
 
 
-const express = require("express")
-const User = require("../models/user")
-const Post = require("../models/post")
-const bcrypt = require("bcryptjs")
-const mongoose = require("mongoose")
-const jwt = require("jsonwebtoken")
-const router = express.Router();
-const Course = require("../models/course");
+    const express = require("express")  ;
+const User = require("../models/user") ; 
+const Post = require("../models/post") ;
+const bcrypt = require("bcryptjs") ;
+const mongoose = require("mongoose") ;
+const jwt = require("jsonwebtoken") ;
+const router = express.Router() ; 
+const Course = require("../models/course") ;
 
-// Middleware to verify JWT token
-const verifyToken = (req, res, next) => {
-  const token = req.headers.authorization?.split(" ")[1]
-  if (!token) {
-    return res.status(401).json({ success: false, message: "No token provided" })
-  }
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "your-secret-key")
-    req.userId = decoded.userId
-    next()
-  } catch (error) {
-    return res.status(401).json({ success: false, message: "Invalid token" })
-  }
-}
+// ✅ FIXED: Correct import path (removed 's' from 'auths')
+const { verifyToken } = require("../middleware/auth");
+
 
 // ✅ Validation middleware for userId
 const validateUserId = (req, res, next) => {
   const { userId } = req.params
   console.log(`🔍 Validating userId: "${userId}" (type: ${typeof userId})`)
-
+  
   if (!userId || userId === "null" || userId === "undefined" || userId.trim() === "") {
     console.log(`❌ Invalid userId: ${userId}`)
     return res.status(400).json({
@@ -2893,7 +2882,7 @@ const validateUserId = (req, res, next) => {
       message: "Valid user ID is required. Please login again.",
     })
   }
-
+  
   if (!mongoose.Types.ObjectId.isValid(userId)) {
     console.log(`❌ Invalid ObjectId format: ${userId}`)
     return res.status(400).json({
@@ -2901,7 +2890,7 @@ const validateUserId = (req, res, next) => {
       message: "Invalid user ID format. Please login again.",
     })
   }
-
+  
   console.log(`✅ UserId validation passed: ${userId}`)
   next()
 }
@@ -2911,7 +2900,6 @@ router.put("/follow/:userId", async (req, res) => {
   try {
     const { currentUserId } = req.body
     const userToFollow = req.params.userId
-
     console.log(`👥 Follow request: ${currentUserId} -> ${userToFollow}`)
 
     // Validation
@@ -3044,7 +3032,6 @@ router.get("/profile/:userId", validateUserId, async (req, res) => {
 
     // Get user data
     const user = await User.findById(userId).select("-password")
-
     if (!user) {
       console.log(`❌ User not found: ${userId}`)
       return res.status(404).json({
@@ -3065,11 +3052,10 @@ router.get("/profile/:userId", validateUserId, async (req, res) => {
 
     try {
       posts = await Post.find({ userId }).populate("userId", "name email profilePicture").sort({ createdAt: -1 })
-
       // Calculate stats
       stats = {
         totalPosts: posts.length,
-        totalLikes: posts.reduce((sum, post) => sum + (post.likes || 0), 0),
+        totalLikes: posts.reduce((sum, post) => sum + (post.likes?.length || 0), 0),
         totalComments: posts.reduce((sum, post) => sum + (post.comments?.length || 0), 0),
         totalVideos: posts.filter((post) => post.videoUrl).length,
         totalImages: posts.filter((post) => post.imageUrl && !post.videoUrl).length,
@@ -3079,7 +3065,6 @@ router.get("/profile/:userId", validateUserId, async (req, res) => {
     }
 
     console.log(`✅ Profile data fetched for: ${user.name}`)
-
     res.json({
       success: true,
       user: {
@@ -3097,7 +3082,7 @@ router.get("/profile/:userId", validateUserId, async (req, res) => {
         // ✅ NEW PROFILE FIELDS
         bio: user.bio || "",
         isVerified: user.isVerified || false,
-        isPrivate: user.isPrivate || false, // ✅ Privacy field added
+        isPrivate: user.isPrivate || false,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
       },
@@ -3175,10 +3160,9 @@ router.get("/following/:userId", validateUserId, async (req, res) => {
 router.put("/profile/:userId", validateUserId, async (req, res) => {
   try {
     const { userId } = req.params
-    const { name, email, profilePicture, bio, isPrivate } = req.body // ✅ isPrivate added
-
+    const { name, email, profilePicture, bio, isPrivate } = req.body
     console.log(`🔄 Updating profile for userId: ${userId}`)
-    console.log('Update data:', { name, email, bio, isPrivate }) // ✅ Debug log
+    console.log('Update data:', { name, email, bio, isPrivate })
 
     // Validation
     if (!name) {
@@ -3202,7 +3186,6 @@ router.put("/profile/:userId", validateUserId, async (req, res) => {
         email: email.trim(),
         _id: { $ne: userId },
       })
-
       if (emailExists) {
         return res.status(400).json({
           success: false,
@@ -3228,11 +3211,11 @@ router.put("/profile/:userId", validateUserId, async (req, res) => {
     // ✅ Update privacy setting
     if (isPrivate !== undefined) updateData.isPrivate = isPrivate
 
-    console.log('Final update data:', updateData) // ✅ Debug log
+    console.log('Final update data:', updateData)
 
     const updatedUser = await User.findByIdAndUpdate(
-      userId, 
-      updateData, 
+      userId,
+      updateData,
       { new: true, runValidators: true }
     ).select("-password")
 
@@ -3244,7 +3227,6 @@ router.put("/profile/:userId", validateUserId, async (req, res) => {
     }
 
     console.log(`✅ Profile updated successfully`)
-
     res.json({
       success: true,
       message: "Profile updated successfully",
@@ -3253,16 +3235,15 @@ router.put("/profile/:userId", validateUserId, async (req, res) => {
         name: updatedUser.name,
         email: updatedUser.email,
         profilePicture: updatedUser.profilePicture || "",
-        bio: updatedUser.bio || "", // ✅ Bio return
-        isPrivate: updatedUser.isPrivate || false, // ✅ Privacy return
-        isVerified: updatedUser.isVerified || false, // ✅ Verification return
+        bio: updatedUser.bio || "",
+        isPrivate: updatedUser.isPrivate || false,
+        isVerified: updatedUser.isVerified || false,
         followersCount: updatedUser.followersCount || 0,
         followingCount: updatedUser.followingCount || 0,
         createdAt: updatedUser.createdAt,
         updatedAt: updatedUser.updatedAt,
       },
     })
-
   } catch (err) {
     console.error("❌ Update profile error:", err)
     res.status(500).json({
@@ -3278,7 +3259,6 @@ router.put("/change-password/:userId", validateUserId, async (req, res) => {
   try {
     const { userId } = req.params
     const { currentPassword, newPassword } = req.body
-
     console.log(`🔐 Password change request for userId: ${userId}`)
 
     if (!currentPassword || !newPassword) {
@@ -3295,8 +3275,7 @@ router.put("/change-password/:userId", validateUserId, async (req, res) => {
       })
     }
 
-    const user = await User.findById(userId)
-
+    const user = await User.findById(userId).select("+password")
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -3305,7 +3284,6 @@ router.put("/change-password/:userId", validateUserId, async (req, res) => {
     }
 
     const isMatch = await bcrypt.compare(currentPassword, user.password)
-
     if (!isMatch) {
       return res.status(400).json({
         success: false,
@@ -3314,16 +3292,13 @@ router.put("/change-password/:userId", validateUserId, async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 12)
-
     await User.findByIdAndUpdate(userId, { password: hashedPassword })
 
     console.log(`✅ Password changed successfully`)
-
     res.json({
       success: true,
       message: "Password changed successfully",
     })
-
   } catch (err) {
     console.error("❌ Password change error:", err)
     res.status(500).json({
@@ -3338,7 +3313,6 @@ router.put("/profile-picture/:userId", validateUserId, async (req, res) => {
   try {
     const { userId } = req.params
     const { profilePicture } = req.body
-
     console.log(`🖼️ Updating profile picture for userId: ${userId}`)
 
     if (!profilePicture) {
@@ -3349,8 +3323,8 @@ router.put("/profile-picture/:userId", validateUserId, async (req, res) => {
     }
 
     const updatedUser = await User.findByIdAndUpdate(
-      userId, 
-      { profilePicture }, 
+      userId,
+      { profilePicture },
       { new: true }
     ).select("-password")
 
@@ -3362,7 +3336,6 @@ router.put("/profile-picture/:userId", validateUserId, async (req, res) => {
     }
 
     console.log(`✅ Profile picture updated`)
-
     res.json({
       success: true,
       message: "Profile picture updated successfully",
@@ -3378,7 +3351,6 @@ router.put("/profile-picture/:userId", validateUserId, async (req, res) => {
         updatedAt: updatedUser.updatedAt,
       },
     })
-
   } catch (err) {
     console.error("❌ Update profile picture error:", err)
     res.status(500).json({
@@ -3392,14 +3364,13 @@ router.put("/profile-picture/:userId", validateUserId, async (req, res) => {
 router.get("/:userId/groups", validateUserId, async (req, res) => {
   try {
     const { userId } = req.params
-
     const user = await User.findById(userId).populate("groups")
 
     if (!user) {
       return res.status(404).json({ success: false, message: "User not found" })
     }
 
-    res.json({ 
+    res.json({
       success: true,
       groups: user.groups || [],
       count: user.groups?.length || 0
@@ -3413,10 +3384,8 @@ router.get("/:userId/groups", validateUserId, async (req, res) => {
 // ✅ FCM Token endpoint - REQUIRED FOR NOTIFICATIONS
 router.post("/fcm-token", async (req, res) => {
   const { userId, fcmToken } = req.body
-
   try {
     console.log(`💾 Saving FCM token for user: ${userId}`)
-
     if (!userId || !fcmToken) {
       return res.status(400).json({ success: false, message: "userId and fcmToken required" })
     }
@@ -3429,15 +3398,13 @@ router.post("/fcm-token", async (req, res) => {
     }
 
     const updatedUser = await User.findByIdAndUpdate(userId, { fcmToken }, { new: true })
-
     if (!updatedUser) {
       console.log(`❌ User not found: ${userId}`)
       return res.status(404).json({ success: false, message: "User not found" })
     }
 
     console.log(`✅ FCM token saved for user: ${updatedUser.name}`)
-
-    res.json({ 
+    res.json({
       success: true,
       message: "FCM token saved successfully"
     })
@@ -3450,10 +3417,8 @@ router.post("/fcm-token", async (req, res) => {
 // ✅ Join Group endpoint - REQUIRED FOR NOTIFICATIONS
 router.post("/join-group", async (req, res) => {
   const { userId, groupId } = req.body
-
   try {
     console.log(`👥 Adding user ${userId} to group ${groupId}`)
-
     if (!userId || !groupId) {
       return res.status(400).json({ success: false, message: "userId and groupId required" })
     }
@@ -3467,14 +3432,12 @@ router.post("/join-group", async (req, res) => {
 
     // Add group to user's groups array
     const updatedUser = await User.findByIdAndUpdate(userId, { $addToSet: { groups: groupId } }, { new: true })
-
     if (!updatedUser) {
       return res.status(404).json({ success: false, message: "User not found" })
     }
 
     console.log(`✅ User ${updatedUser.name} added to group`)
-
-    res.json({ 
+    res.json({
       success: true,
       message: "Successfully joined group"
     })
@@ -3484,172 +3447,174 @@ router.post("/join-group", async (req, res) => {
   }
 })
 
-
-// ✅ Save/Unsave Course
+// ✅ ENHANCED: Save/Unsave Course with better error handling
 router.put('/save-course/:courseId', verifyToken, async (req, res) => {
   try {
-    const { courseId } = req.params;
-    const userId = req.userId; // Get from verified token
-
-    console.log(`💾 Save/Unsave request - User: ${userId}, Course: ${courseId}`);
+    const { courseId } = req.params
+    const userId = req.userId // Get from verified token
+    
+    console.log(`💾 Save/Unsave request - User: ${userId}, Course: ${courseId}`)
 
     // Validation
     if (!mongoose.Types.ObjectId.isValid(courseId)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Invalid Course ID format" 
-      });
+      return res.status(400).json({
+        success: false,
+        message: "Invalid Course ID format"
+      })
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid User ID format"
+      })
     }
 
     // Check if course exists
-    const course = await Course.findById(courseId);
+    const course = await Course.findById(courseId)
     if (!course) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Course not found" 
-      });
+      return res.status(404).json({
+        success: false,
+        message: "Course not found"
+      })
     }
 
-    const user = await User.findById(userId);
+    const user = await User.findById(userId)
     if (!user) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "User not found" 
-      });
+      return res.status(404).json({
+        success: false,
+        message: "User not found. Please login again."
+      })
     }
 
     // Initialize savedCourses array if it doesn't exist
     if (!user.savedCourses) {
-      user.savedCourses = [];
+      user.savedCourses = []
     }
 
     // Check if course is already saved
-    const courseIndex = user.savedCourses.indexOf(courseId);
-    let isSaved;
+    const courseIndex = user.savedCourses.findIndex(
+      savedCourseId => savedCourseId.toString() === courseId
+    )
     
+    let isSaved
+
     if (courseIndex > -1) {
       // Remove from saved
-      user.savedCourses.splice(courseIndex, 1);
-      isSaved = false;
-      console.log(`✅ Course removed from saved list: ${course.title}`);
+      user.savedCourses.splice(courseIndex, 1)
+      isSaved = false
+      console.log(`✅ Course removed from saved list: ${course.title}`)
     } else {
       // Add to saved
-      user.savedCourses.push(courseId);
-      isSaved = true;
-      console.log(`✅ Course saved: ${course.title}`);
+      user.savedCourses.push(courseId)
+      isSaved = true
+      console.log(`✅ Course saved: ${course.title}`)
     }
 
-    await user.save();
+    await user.save()
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       isSaved,
       message: isSaved ? "Course saved successfully" : "Course removed from saved list",
       savedCount: user.savedCourses.length
-    });
+    })
 
   } catch (error) {
-    console.error("❌ Save/Unsave course error:", error);
-    res.status(500).json({ 
-      success: false, 
+    console.error("❌ Save/Unsave course error:", error)
+    res.status(500).json({
+      success: false,
       message: "Server error while processing save/unsave",
-      error: error.message 
-    });
+      error: error.message
+    })
   }
-});
+})
 
-// ✅ Check if Course is Saved
+// ✅ ENHANCED: Check if Course is Saved
 router.get('/check-saved/:courseId', verifyToken, async (req, res) => {
   try {
-    const { courseId } = req.params;
-    const userId = req.userId;
-
-    console.log(`🔍 Checking save status - User: ${userId}, Course: ${courseId}`);
+    const { courseId } = req.params
+    const userId = req.userId
+    
+    console.log(`🔍 Checking save status - User: ${userId}, Course: ${courseId}`)
 
     if (!mongoose.Types.ObjectId.isValid(courseId)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Invalid Course ID format" 
-      });
+      return res.status(400).json({
+        success: false,
+        message: "Invalid Course ID format"
+      })
     }
 
-    const user = await User.findById(userId);
+    const user = await User.findById(userId)
     if (!user) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "User not found" 
-      });
+      return res.status(404).json({
+        success: false,
+        message: "User not found. Please login again."
+      })
     }
 
     // Initialize savedCourses if it doesn't exist
     if (!user.savedCourses) {
-      user.savedCourses = [];
-      await user.save();
+      user.savedCourses = []
+      await user.save()
     }
 
-    const isSaved = user.savedCourses.includes(courseId);
+    const isSaved = user.savedCourses.some(
+      savedCourseId => savedCourseId.toString() === courseId
+    )
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       isSaved,
       savedCount: user.savedCourses.length
-    });
+    })
 
   } catch (error) {
-    console.error("❌ Check saved status error:", error);
-    res.status(500).json({ 
-      success: false, 
-      message: "Server error while checking save status" 
-    });
+    console.error("❌ Check saved status error:", error)
+    res.status(500).json({
+      success: false,
+      message: "Server error while checking save status"
+    })
   }
-});
+})
 
 // ✅ Get User's Saved Courses
 router.get('/saved-courses', verifyToken, async (req, res) => {
   try {
-    const userId = req.userId;
-
-    console.log(`📚 Fetching saved courses for user: ${userId}`);
+    const userId = req.userId
+    console.log(`📚 Fetching saved courses for user: ${userId}`)
 
     const user = await User.findById(userId).populate({
       path: 'savedCourses',
-      select: 'title description thumbnailUrl videoUrl instructorName duration views likesCount',
+      select: 'title description thumbnailUrl videoUrl instructorName duration views',
       options: { sort: { createdAt: -1 } }
-    });
+    })
 
     if (!user) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "User not found" 
-      });
+      return res.status(404).json({
+        success: false,
+        message: "User not found. Please login again."
+      })
     }
 
     // Return empty array if no saved courses
-    const savedCourses = user.savedCourses || [];
+    const savedCourses = user.savedCourses || []
+    console.log(`✅ Found ${savedCourses.length} saved courses`)
 
-    console.log(`✅ Found ${savedCourses.length} saved courses`);
-
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       savedCourses,
       count: savedCourses.length
-    });
+    })
 
   } catch (error) {
-    console.error("❌ Get saved courses error:", error);
-    res.status(500).json({ 
-      success: false, 
+    console.error("❌ Get saved courses error:", error)
+    res.status(500).json({
+      success: false,
       message: "Server error while fetching saved courses",
-      error: error.message 
-    });
+      error: error.message
+    })
   }
-});
+})
 
-  module.exports = router
-
-
-
-
-
-
-
+module.exports = router
