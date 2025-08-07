@@ -14178,7 +14178,7 @@ mongoose
     const authRoutes = require("./routes/authroutes")
     const postRoutes = require("./routes/postroutes")
     const uploadRoutes = require("./routes/upload")
-    const userRoutes = require("./routes/userroutes")
+    const userRoutes = require("./routes/userroutes").default
 
     app.use("/api/auth", authRoutes)
     app.use("/api/posts", postRoutes)

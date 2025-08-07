@@ -2857,14 +2857,14 @@
 
 
 
-const express = require("express")
-const User = require("../models/user")
-const Post = require("../models/post")
-const bcrypt = require("bcryptjs")
-const mongoose = require("mongoose")
-const jwt = require("jsonwebtoken")
-const router = express.Router();
-const Course = require("../models/course");
+import { Router } from "express"
+import { findById, findOne, findByIdAndUpdate } from "../models/user"
+import { find } from "../models/post"
+import { compare, hash } from "bcryptjs"
+import { Types } from "mongoose"
+import { verify } from "jsonwebtoken"
+const router = Router();
+import { findById as _findById } from "../models/course"
 
 // Middleware to verify JWT token
 const verifyToken = (req, res, next) => {
@@ -2873,7 +2873,7 @@ const verifyToken = (req, res, next) => {
     return res.status(401).json({ success: false, message: "No token provided" })
   }
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "your-secret-key")
+    const decoded = verify(token, process.env.JWT_SECRET || "your-secret-key")
     req.userId = decoded.userId
     next()
   } catch (error) {
@@ -2894,7 +2894,7 @@ const validateUserId = (req, res, next) => {
     })
   }
 
-  if (!mongoose.Types.ObjectId.isValid(userId)) {
+  if (!Types.ObjectId.isValid(userId)) {
     console.log(`❌ Invalid ObjectId format: ${userId}`)
     return res.status(400).json({
       success: false,
@@ -2931,15 +2931,15 @@ router.put("/follow/:userId", async (req, res) => {
     }
 
     // Validate ObjectIds
-    if (!mongoose.Types.ObjectId.isValid(currentUserId) || !mongoose.Types.ObjectId.isValid(userToFollow)) {
+    if (!Types.ObjectId.isValid(currentUserId) || !Types.ObjectId.isValid(userToFollow)) {
       return res.status(400).json({
         success: false,
         message: "Invalid user ID format",
       })
     }
 
-    const currentUser = await User.findById(currentUserId)
-    const targetUser = await User.findById(userToFollow)
+    const currentUser = await findById(currentUserId)
+    const targetUser = await findById(userToFollow)
 
     if (!currentUser || !targetUser) {
       return res.status(404).json({
@@ -2997,15 +2997,15 @@ router.get("/check-follow/:userId/:currentUserId", async (req, res) => {
     const { userId, currentUserId } = req.params
     console.log(`🔍 Checking follow status: ${currentUserId} -> ${userId}`)
 
-    if (!mongoose.Types.ObjectId.isValid(userId) || !mongoose.Types.ObjectId.isValid(currentUserId)) {
+    if (!Types.ObjectId.isValid(userId) || !Types.ObjectId.isValid(currentUserId)) {
       return res.status(400).json({
         success: false,
         message: "Invalid user ID format",
       })
     }
 
-    const currentUser = await User.findById(currentUserId)
-    const targetUser = await User.findById(userId)
+    const currentUser = await findById(currentUserId)
+    const targetUser = await findById(userId)
 
     if (!currentUser || !targetUser) {
       return res.status(404).json({
@@ -3043,7 +3043,7 @@ router.get("/profile/:userId", validateUserId, async (req, res) => {
     console.log(`🔍 Fetching profile for userId: ${userId}`)
 
     // Get user data
-    const user = await User.findById(userId).select("-password")
+    const user = await findById(userId).select("-password")
 
     if (!user) {
       console.log(`❌ User not found: ${userId}`)
@@ -3064,7 +3064,7 @@ router.get("/profile/:userId", validateUserId, async (req, res) => {
     }
 
     try {
-      posts = await Post.find({ userId }).populate("userId", "name email profilePicture").sort({ createdAt: -1 })
+      posts = await find({ userId }).populate("userId", "name email profilePicture").sort({ createdAt: -1 })
 
       // Calculate stats
       stats = {
@@ -3119,7 +3119,7 @@ router.get("/followers/:userId", validateUserId, async (req, res) => {
     const { userId } = req.params
     console.log(`👥 Getting followers for userId: ${userId}`)
 
-    const user = await User.findById(userId).populate("followers", "name email profilePicture followersCount bio isVerified")
+    const user = await findById(userId).populate("followers", "name email profilePicture followersCount bio isVerified")
 
     if (!user) {
       return res.status(404).json({
@@ -3148,7 +3148,7 @@ router.get("/following/:userId", validateUserId, async (req, res) => {
     const { userId } = req.params
     console.log(`👥 Getting following for userId: ${userId}`)
 
-    const user = await User.findById(userId).populate("following", "name email profilePicture followersCount bio isVerified")
+    const user = await findById(userId).populate("following", "name email profilePicture followersCount bio isVerified")
 
     if (!user) {
       return res.status(404).json({
@@ -3198,7 +3198,7 @@ router.put("/profile/:userId", validateUserId, async (req, res) => {
 
     // Check if email is already taken by another user (if email is being updated)
     if (email) {
-      const emailExists = await User.findOne({
+      const emailExists = await findOne({
         email: email.trim(),
         _id: { $ne: userId },
       })
@@ -3230,7 +3230,7 @@ router.put("/profile/:userId", validateUserId, async (req, res) => {
 
     console.log('Final update data:', updateData) // ✅ Debug log
 
-    const updatedUser = await User.findByIdAndUpdate(
+    const updatedUser = await findByIdAndUpdate(
       userId, 
       updateData, 
       { new: true, runValidators: true }
@@ -3295,7 +3295,7 @@ router.put("/change-password/:userId", validateUserId, async (req, res) => {
       })
     }
 
-    const user = await User.findById(userId)
+    const user = await findById(userId)
 
     if (!user) {
       return res.status(404).json({
@@ -3304,7 +3304,7 @@ router.put("/change-password/:userId", validateUserId, async (req, res) => {
       })
     }
 
-    const isMatch = await bcrypt.compare(currentPassword, user.password)
+    const isMatch = await compare(currentPassword, user.password)
 
     if (!isMatch) {
       return res.status(400).json({
@@ -3313,9 +3313,9 @@ router.put("/change-password/:userId", validateUserId, async (req, res) => {
       })
     }
 
-    const hashedPassword = await bcrypt.hash(newPassword, 12)
+    const hashedPassword = await hash(newPassword, 12)
 
-    await User.findByIdAndUpdate(userId, { password: hashedPassword })
+    await findByIdAndUpdate(userId, { password: hashedPassword })
 
     console.log(`✅ Password changed successfully`)
 
@@ -3348,7 +3348,7 @@ router.put("/profile-picture/:userId", validateUserId, async (req, res) => {
       })
     }
 
-    const updatedUser = await User.findByIdAndUpdate(
+    const updatedUser = await findByIdAndUpdate(
       userId, 
       { profilePicture }, 
       { new: true }
@@ -3393,7 +3393,7 @@ router.get("/:userId/groups", validateUserId, async (req, res) => {
   try {
     const { userId } = req.params
 
-    const user = await User.findById(userId).populate("groups")
+    const user = await findById(userId).populate("groups")
 
     if (!user) {
       return res.status(404).json({ success: false, message: "User not found" })
@@ -3421,14 +3421,14 @@ router.post("/fcm-token", async (req, res) => {
       return res.status(400).json({ success: false, message: "userId and fcmToken required" })
     }
 
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
+    if (!Types.ObjectId.isValid(userId)) {
       return res.status(400).json({
         success: false,
         message: 'Invalid user ID format'
       })
     }
 
-    const updatedUser = await User.findByIdAndUpdate(userId, { fcmToken }, { new: true })
+    const updatedUser = await findByIdAndUpdate(userId, { fcmToken }, { new: true })
 
     if (!updatedUser) {
       console.log(`❌ User not found: ${userId}`)
@@ -3458,7 +3458,7 @@ router.post("/join-group", async (req, res) => {
       return res.status(400).json({ success: false, message: "userId and groupId required" })
     }
 
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
+    if (!Types.ObjectId.isValid(userId)) {
       return res.status(400).json({
         success: false,
         message: 'Invalid user ID format'
@@ -3466,7 +3466,7 @@ router.post("/join-group", async (req, res) => {
     }
 
     // Add group to user's groups array
-    const updatedUser = await User.findByIdAndUpdate(userId, { $addToSet: { groups: groupId } }, { new: true })
+    const updatedUser = await findByIdAndUpdate(userId, { $addToSet: { groups: groupId } }, { new: true })
 
     if (!updatedUser) {
       return res.status(404).json({ success: false, message: "User not found" })
@@ -3494,7 +3494,7 @@ router.put('/save-course/:courseId', verifyToken, async (req, res) => {
     console.log(`💾 Save/Unsave request - User: ${userId}, Course: ${courseId}`);
 
     // Validation
-    if (!mongoose.Types.ObjectId.isValid(courseId)) {
+    if (!Types.ObjectId.isValid(courseId)) {
       return res.status(400).json({ 
         success: false, 
         message: "Invalid Course ID format" 
@@ -3502,7 +3502,7 @@ router.put('/save-course/:courseId', verifyToken, async (req, res) => {
     }
 
     // Check if course exists
-    const course = await Course.findById(courseId);
+    const course = await _findById(courseId);
     if (!course) {
       return res.status(404).json({ 
         success: false, 
@@ -3510,7 +3510,7 @@ router.put('/save-course/:courseId', verifyToken, async (req, res) => {
       });
     }
 
-    const user = await User.findById(userId);
+    const user = await findById(userId);
     if (!user) {
       return res.status(404).json({ 
         success: false, 
@@ -3566,14 +3566,14 @@ router.get('/check-saved/:courseId', verifyToken, async (req, res) => {
 
     console.log(`🔍 Checking save status - User: ${userId}, Course: ${courseId}`);
 
-    if (!mongoose.Types.ObjectId.isValid(courseId)) {
+    if (!Types.ObjectId.isValid(courseId)) {
       return res.status(400).json({ 
         success: false, 
         message: "Invalid Course ID format" 
       });
     }
 
-    const user = await User.findById(userId);
+    const user = await findById(userId);
     if (!user) {
       return res.status(404).json({ 
         success: false, 
@@ -3611,7 +3611,7 @@ router.get('/saved-courses', verifyToken, async (req, res) => {
 
     console.log(`📚 Fetching saved courses for user: ${userId}`);
 
-    const user = await User.findById(userId).populate({
+    const user = await findById(userId).populate({
       path: 'savedCourses',
       select: 'title description thumbnailUrl videoUrl instructorName duration views likesCount',
       options: { sort: { createdAt: -1 } }
@@ -3645,7 +3645,7 @@ router.get('/saved-courses', verifyToken, async (req, res) => {
   }
 });
 
-  module.exports = router
+  export default router
 
 
 
