@@ -310,7 +310,7 @@ const jwt = require("jsonwebtoken")
 console.log("🔍 Auth Controller - JWT_SECRET exists:", !!process.env.JWT_SECRET)
 console.log("🔍 Auth Controller - JWT_SECRET length:", process.env.JWT_SECRET?.length)
 
-// ✅ Register function
+// ✅ Register function with enhanced error handling
 const register = async (req, res) => {
   const { name, email, password } = req.body
   
@@ -319,6 +319,7 @@ const register = async (req, res) => {
     
     // Input validation
     if (!name || !email || !password) {
+      console.log("❌ Missing required fields")
       return res.status(400).json({
         success: false,
         error: "Name, email, and password are required",
@@ -326,6 +327,7 @@ const register = async (req, res) => {
     }
     
     if (password.length < 6) {
+      console.log("❌ Password too short")
       return res.status(400).json({
         success: false,
         error: "Password must be at least 6 characters",
@@ -333,8 +335,10 @@ const register = async (req, res) => {
     }
 
     // Check if user already exists
-    const existingUser = await User.findOne({ email })
+    console.log("🔍 Checking if user exists...")
+    const existingUser = await User.findOne({ email: email.toLowerCase() })
     if (existingUser) {
+      console.log("❌ User already exists:", email)
       return res.status(400).json({
         success: false,
         error: "Email already exists",
@@ -342,17 +346,19 @@ const register = async (req, res) => {
     }
 
     // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10)
+    console.log("🔐 Hashing password...")
+    const hashedPassword = await bcrypt.hash(password, 12)
     
     // Create new user
+    console.log("👤 Creating new user...")
     const newUser = new User({ 
-      name, 
-      email, 
+      name: name.trim(), 
+      email: email.toLowerCase().trim(), 
       password: hashedPassword 
     })
     
-    await newUser.save()
-    console.log(`✅ User registered: ${newUser.name} (ID: ${newUser._id})`)
+    const savedUser = await newUser.save()
+    console.log(`✅ User registered successfully: ${savedUser.name} (ID: ${savedUser._id})`)
 
     // ✅ Check JWT_SECRET before generating token
     if (!process.env.JWT_SECRET) {
@@ -365,13 +371,13 @@ const register = async (req, res) => {
 
     // ✅ Generate token immediately after registration
     const token = jwt.sign(
-      { userId: newUser._id }, 
+      { userId: savedUser._id }, 
       process.env.JWT_SECRET, 
       { expiresIn: "7d" }
     )
 
     console.log("✅ Token generated for new user:", {
-      userId: newUser._id.toString(),
+      userId: savedUser._id.toString(),
       tokenLength: token.length
     })
 
@@ -380,15 +386,32 @@ const register = async (req, res) => {
       message: "User registered successfully",
       token, // ✅ Include token in registration response
       user: {
-        id: newUser._id.toString(), // ✅ String format for React Native
-        _id: newUser._id,
-        name: newUser.name,
-        email: newUser.email,
-        profilePicture: newUser.profilePicture || "",
+        id: savedUser._id.toString(), // ✅ String format for React Native
+        _id: savedUser._id,
+        name: savedUser.name,
+        email: savedUser.email,
+        profilePicture: savedUser.profilePicture || "",
       },
     })
   } catch (error) {
     console.error("❌ Registration error:", error)
+    
+    // Handle specific MongoDB errors
+    if (error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        error: "Email already exists",
+      })
+    }
+    
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(err => err.message)
+      return res.status(400).json({
+        success: false,
+        error: messages.join(', '),
+      })
+    }
+    
     res.status(500).json({
       success: false,
       error: "Something went wrong during registration",
@@ -396,7 +419,7 @@ const register = async (req, res) => {
   }
 }
 
-// ✅ Login function
+// ✅ Login function with enhanced error handling
 const login = async (req, res) => {
   const { email, password } = req.body
   
@@ -405,29 +428,45 @@ const login = async (req, res) => {
     
     // Input validation
     if (!email || !password) {
+      console.log("❌ Missing email or password")
       return res.status(400).json({
         success: false,
         error: "Email and password are required",
       })
     }
 
-    // Find user
-    const user = await User.findOne({ email })
+    // Find user (include password for comparison)
+    console.log("🔍 Finding user in database for email:", email.toLowerCase().trim())
+    const user = await User.findOne({ email: email.toLowerCase().trim() }).select('+password')
+    
     if (!user) {
+      console.log("❌ User not found for email:", email)
       return res.status(404).json({
         success: false,
-        error: "User not found",
+        error: "Invalid email or password", // Don't reveal if email exists
       })
     }
 
+    console.log("✅ User found:", user.name)
+    // ✅ IMPORTANT DEBUGGING STEP: Log the password field
+    console.log("DEBUG: user.password (exists):", !!user.password);
+    console.log("DEBUG: user.password (type):", typeof user.password);
+    console.log("DEBUG: user.password (length):", user.password ? user.password.length : 'N/A');
+
     // Check password
-    const isMatch = await bcrypt.compare(password, user.password)
+    console.log("🔐 Comparing passwords...")
+    // This is the line where the error occurs if user.password is undefined
+    const isMatch = await bcrypt.compare(password, user.password) 
+    
     if (!isMatch) {
+      console.log("❌ Password mismatch for user:", email)
       return res.status(400).json({
         success: false,
-        error: "Invalid credentials",
+        error: "Invalid email or password",
       })
     }
+
+    console.log("✅ Password match successful")
 
     // ✅ Check JWT_SECRET before generating token
     if (!process.env.JWT_SECRET) {
@@ -439,13 +478,14 @@ const login = async (req, res) => {
     }
 
     // Generate token
+    console.log("🔑 Generating JWT token...")
     const token = jwt.sign(
       { userId: user._id }, 
       process.env.JWT_SECRET, 
       { expiresIn: "7d" }
     )
 
-    console.log(`✅ User logged in: ${user.name} (ID: ${user._id})`)
+    console.log(`✅ Login successful: ${user.name} (ID: ${user._id})`)
     console.log(`🔑 Token generated:`, {
       userId: user._id.toString(),
       tokenLength: token.length
@@ -454,9 +494,10 @@ const login = async (req, res) => {
     // ✅ Return user data exactly as React Native expects
     res.json({
       success: true,
+      message: "Login successful",
       token,
       user: {
-        id: user._id.toString(), // ✅ React Native के लिए string format
+        id: user._id.toString(),
         _id: user._id,
         name: user.name,
         email: user.email,
@@ -464,10 +505,13 @@ const login = async (req, res) => {
       },
     })
   } catch (error) {
-    console.error("❌ Login error:", error)
+    console.error("❌ Login error details:", error)
+    console.error("❌ Error name:", error.name)
+    console.error("❌ Error message:", error.message)
+    
     res.status(500).json({
       success: false,
-      error: "Login failed",
+      error: "Login failed - server error",
     })
   }
 }
