@@ -12153,40 +12153,71 @@ mongoose
 
 
     // Save/Unsave Course
+  // Save/Unsave Course - Fixed version
 app.put('/api/courses/save/:courseId', async (req, res) => {
   try {
     const { courseId } = req.params;
     const { userId } = req.body;
 
     if (!userId || !courseId) {
-      return res.status(400).json({ success: false, message: "User ID and Course ID are required" });
+      return res.status(400).json({ 
+        success: false, 
+        message: "User ID and Course ID are required" 
+      });
+    }
+
+    // Validate ObjectIds
+    if (!mongoose.Types.ObjectId.isValid(userId) || 
+        !mongoose.Types.ObjectId.isValid(courseId)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Invalid ID format" 
+      });
     }
 
     const user = await User.findById(userId);
     const course = await Course.findById(courseId);
 
     if (!user || !course) {
-      return res.status(404).json({ success: false, message: "User or Course not found" });
+      return res.status(404).json({ 
+        success: false, 
+        message: "User or Course not found" 
+      });
     }
 
-    const isSaved = user.savedCourses.includes(courseId);
+    const courseObjectId = new mongoose.Types.ObjectId(courseId);
+    const isSaved = user.savedCourses.some(id => id.equals(courseObjectId));
     
     if (isSaved) {
       // Remove from saved
-      user.savedCourses = user.savedCourses.filter(id => id.toString() !== courseId);
+      user.savedCourses = user.savedCourses.filter(id => !id.equals(courseObjectId));
       await user.save();
-      return res.json({ success: true, isSaved: false, message: "Course removed from saved" });
+      return res.json({ 
+        success: true, 
+        isSaved: false, 
+        message: "Course removed from saved" 
+      });
     } else {
       // Add to saved
-      user.savedCourses.push(courseId);
+      user.savedCourses.push(courseObjectId);
       await user.save();
-      return res.json({ success: true, isSaved: true, message: "Course saved successfully" });
+      return res.json({ 
+        success: true, 
+        isSaved: true, 
+        message: "Course saved successfully" 
+      });
     }
   } catch (error) {
     console.error("Save course error:", error);
-    res.status(500).json({ success: false, message: "Failed to save course" });
+    res.status(500).json({ 
+      success: false, 
+      message: "Failed to save course",
+      error: error.message 
+    });
   }
 });
+
+
 
 // Check if course is saved
 app.get('/api/courses/check-saved/:courseId/:userId', async (req, res) => {

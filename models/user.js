@@ -197,6 +197,10 @@ const userSchema = new mongoose.Schema(
   {
     name: String,
     email: { type: String, unique: true },
+    savedCourses: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Course'
+  }],
     password: String,
     profilePicture: { type: String, default: "" },
     fcmToken: String,
