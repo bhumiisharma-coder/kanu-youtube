@@ -11543,10 +11543,7 @@ const courseSchema = new mongoose.Schema(
       },
     ],
     views: { type: Number, default: 0 },
-      savedCourses: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Course'
-  }],
+      
   },
   { timestamps: true },
 )
@@ -12154,105 +12151,10 @@ mongoose
 
     // Save/Unsave Course
   // Save/Unsave Course - Fixed version
-app.put('/api/courses/save/:courseId', async (req, res) => {
-  try {
-    const { courseId } = req.params;
-    const { userId } = req.body;
-
-    if (!userId || !courseId) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "User ID and Course ID are required" 
-      });
-    }
-
-    // Validate ObjectIds
-    if (!mongoose.Types.ObjectId.isValid(userId) || 
-        !mongoose.Types.ObjectId.isValid(courseId)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Invalid ID format" 
-      });
-    }
-
-    const user = await User.findById(userId);
-    const course = await Course.findById(courseId);
-
-    if (!user || !course) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "User or Course not found" 
-      });
-    }
-
-    const courseObjectId = new mongoose.Types.ObjectId(courseId);
-    const isSaved = user.savedCourses.some(id => id.equals(courseObjectId));
-    
-    if (isSaved) {
-      // Remove from saved
-      user.savedCourses = user.savedCourses.filter(id => !id.equals(courseObjectId));
-      await user.save();
-      return res.json({ 
-        success: true, 
-        isSaved: false, 
-        message: "Course removed from saved" 
-      });
-    } else {
-      // Add to saved
-      user.savedCourses.push(courseObjectId);
-      await user.save();
-      return res.json({ 
-        success: true, 
-        isSaved: true, 
-        message: "Course saved successfully" 
-      });
-    }
-  } catch (error) {
-    console.error("Save course error:", error);
-    res.status(500).json({ 
-      success: false, 
-      message: "Failed to save course",
-      error: error.message 
-    });
-  }
-});
+   // Enhanced Save/Unsave Course Endpoint
 
 
-
-// Check if course is saved
-app.get('/api/courses/check-saved/:courseId/:userId', async (req, res) => {
-  try {
-    const { courseId, userId } = req.params;
-
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
-    }
-
-    const isSaved = user.savedCourses.some(id => id.toString() === courseId);
-    res.json({ success: true, isSaved });
-  } catch (error) {
-    console.error("Check saved error:", error);
-    res.status(500).json({ success: false, message: "Failed to check saved status" });
-  }
-});
-
-// Get user's saved courses
-app.get('/api/users/saved-courses/:userId', async (req, res) => {
-  try {
-    const { userId } = req.params;
-
-    const user = await User.findById(userId).populate('savedCourses');
-    if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
-    }
-
-    res.json({ success: true, savedCourses: user.savedCourses });
-  } catch (error) {
-    console.error("Get saved courses error:", error);
-    res.status(500).json({ success: false, message: "Failed to get saved courses" });
-  }
-});
+// Enhanced Check Saved Status
 
 
     console.log("✅ Course Playlist routes setup complete!")

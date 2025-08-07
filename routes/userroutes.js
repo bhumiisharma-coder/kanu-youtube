@@ -1485,6 +1485,641 @@
 
 
 
+// const express = require("express")
+// const User = require("../models/user")
+// const Post = require("../models/post")
+// const bcrypt = require("bcryptjs")
+// const mongoose = require("mongoose")
+// const jwt = require("jsonwebtoken")
+// const router = express.Router()
+
+// // Middleware to verify JWT token
+// const verifyToken = (req, res, next) => {
+//   const token = req.headers.authorization?.split(" ")[1]
+//   if (!token) {
+//     return res.status(401).json({ success: false, message: "No token provided" })
+//   }
+//   try {
+//     const decoded = jwt.verify(token, process.env.JWT_SECRET || "your-secret-key")
+//     req.userId = decoded.userId
+//     next()
+//   } catch (error) {
+//     return res.status(401).json({ success: false, message: "Invalid token" })
+//   }
+// }
+
+// // ✅ Validation middleware for userId
+// const validateUserId = (req, res, next) => {
+//   const { userId } = req.params
+//   console.log(`🔍 Validating userId: "${userId}" (type: ${typeof userId})`)
+
+//   if (!userId || userId === "null" || userId === "undefined" || userId.trim() === "") {
+//     console.log(`❌ Invalid userId: ${userId}`)
+//     return res.status(400).json({
+//       success: false,
+//       message: "Valid user ID is required. Please login again.",
+//     })
+//   }
+
+//   if (!mongoose.Types.ObjectId.isValid(userId)) {
+//     console.log(`❌ Invalid ObjectId format: ${userId}`)
+//     return res.status(400).json({
+//       success: false,
+//       message: "Invalid user ID format. Please login again.",
+//     })
+//   }
+
+//   console.log(`✅ UserId validation passed: ${userId}`)
+//   next()
+// }
+
+// // ⭐ FOLLOW/UNFOLLOW USER - NEW FUNCTIONALITY
+// router.put("/follow/:userId", async (req, res) => {
+//   try {
+//     const { currentUserId } = req.body
+//     const userToFollow = req.params.userId
+
+//     console.log(`👥 Follow request: ${currentUserId} -> ${userToFollow}`)
+
+//     // Validation
+//     if (!currentUserId || !userToFollow) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Both user IDs are required",
+//       })
+//     }
+
+//     // Check if trying to follow self
+//     if (currentUserId === userToFollow) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "You cannot follow yourself",
+//       })
+//     }
+
+//     // Validate ObjectIds
+//     if (!mongoose.Types.ObjectId.isValid(currentUserId) || !mongoose.Types.ObjectId.isValid(userToFollow)) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid user ID format",
+//       })
+//     }
+
+//     const currentUser = await User.findById(currentUserId)
+//     const targetUser = await User.findById(userToFollow)
+
+//     if (!currentUser || !targetUser) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "User not found",
+//       })
+//     }
+
+//     // Initialize arrays if they don't exist
+//     if (!currentUser.following) currentUser.following = []
+//     if (!targetUser.followers) targetUser.followers = []
+//     if (typeof currentUser.followingCount !== "number") currentUser.followingCount = 0
+//     if (typeof targetUser.followersCount !== "number") targetUser.followersCount = 0
+
+//     const isFollowing = currentUser.following.includes(userToFollow)
+
+//     if (isFollowing) {
+//       // ⭐ UNFOLLOW
+//       currentUser.following.pull(userToFollow)
+//       targetUser.followers.pull(currentUserId)
+//       currentUser.followingCount = Math.max(0, currentUser.followingCount - 1)
+//       targetUser.followersCount = Math.max(0, targetUser.followersCount - 1)
+//       console.log(`✅ Unfollowed: ${currentUser.name} unfollowed ${targetUser.name}`)
+//     } else {
+//       // ⭐ FOLLOW
+//       currentUser.following.push(userToFollow)
+//       targetUser.followers.push(currentUserId)
+//       currentUser.followingCount += 1
+//       targetUser.followersCount += 1
+//       console.log(`✅ Followed: ${currentUser.name} followed ${targetUser.name}`)
+//     }
+
+//     await currentUser.save()
+//     await targetUser.save()
+
+//     res.json({
+//       success: true,
+//       isFollowing: !isFollowing,
+//       followersCount: targetUser.followersCount,
+//       followingCount: currentUser.followingCount,
+//       message: isFollowing ? "Unfollowed successfully" : "Followed successfully",
+//     })
+//   } catch (error) {
+//     console.error("❌ Follow error:", error)
+//     res.status(500).json({
+//       success: false,
+//       message: "Server error",
+//     })
+//   }
+// })
+
+// // ⭐ CHECK IF USER IS FOLLOWING ANOTHER USER
+// router.get("/check-follow/:userId/:currentUserId", async (req, res) => {
+//   try {
+//     const { userId, currentUserId } = req.params
+//     console.log(`🔍 Checking follow status: ${currentUserId} -> ${userId}`)
+
+//     if (!mongoose.Types.ObjectId.isValid(userId) || !mongoose.Types.ObjectId.isValid(currentUserId)) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid user ID format",
+//       })
+//     }
+
+//     const currentUser = await User.findById(currentUserId)
+//     const targetUser = await User.findById(userId)
+
+//     if (!currentUser || !targetUser) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "User not found",
+//       })
+//     }
+
+//     // Initialize arrays if they don't exist
+//     if (!currentUser.following) currentUser.following = []
+//     if (typeof targetUser.followersCount !== "number") targetUser.followersCount = 0
+//     if (typeof targetUser.followingCount !== "number") targetUser.followingCount = 0
+
+//     const isFollowing = currentUser.following.includes(userId)
+
+//     res.json({
+//       success: true,
+//       isFollowing,
+//       followersCount: targetUser.followersCount,
+//       followingCount: targetUser.followingCount,
+//     })
+//   } catch (error) {
+//     console.error("❌ Check follow error:", error)
+//     res.status(500).json({
+//       success: false,
+//       message: "Server error",
+//     })
+//   }
+// })
+
+// // ⭐ GET USER PROFILE - UPDATED WITH ALL FIELDS
+// router.get("/profile/:userId", validateUserId, async (req, res) => {
+//   try {
+//     const { userId } = req.params
+//     console.log(`🔍 Fetching profile for userId: ${userId}`)
+
+//     // Get user data
+//     const user = await User.findById(userId).select("-password")
+
+//     if (!user) {
+//       console.log(`❌ User not found: ${userId}`)
+//       return res.status(404).json({
+//         success: false,
+//         message: "User not found",
+//       })
+//     }
+
+//     // Get user's posts if Post model exists
+//     let posts = []
+//     let stats = {
+//       totalPosts: 0,
+//       totalLikes: 0,
+//       totalComments: 0,
+//       totalVideos: 0,
+//       totalImages: 0,
+//     }
+
+//     try {
+//       posts = await Post.find({ userId }).populate("userId", "name email profilePicture").sort({ createdAt: -1 })
+
+//       // Calculate stats
+//       stats = {
+//         totalPosts: posts.length,
+//         totalLikes: posts.reduce((sum, post) => sum + (post.likes || 0), 0),
+//         totalComments: posts.reduce((sum, post) => sum + (post.comments?.length || 0), 0),
+//         totalVideos: posts.filter((post) => post.videoUrl).length,
+//         totalImages: posts.filter((post) => post.imageUrl && !post.videoUrl).length,
+//       }
+//     } catch (postError) {
+//       console.log("⚠️ Post model not found, skipping posts")
+//     }
+
+//     console.log(`✅ Profile data fetched for: ${user.name}`)
+
+//     res.json({
+//       success: true,
+//       user: {
+//         _id: user._id,
+//         name: user.name,
+//         email: user.email,
+//         profilePicture: user.profilePicture || "",
+//         fcmToken: user.fcmToken || "",
+//         groups: user.groups || [],
+//         // ⭐ FOLLOW DATA ADDED
+//         followers: user.followers || [],
+//         following: user.following || [],
+//         followersCount: user.followersCount || 0,
+//         followingCount: user.followingCount || 0,
+//         // ✅ NEW PROFILE FIELDS
+//         bio: user.bio || "",
+//         isVerified: user.isVerified || false,
+//         isPrivate: user.isPrivate || false, // ✅ Privacy field added
+//         createdAt: user.createdAt,
+//         updatedAt: user.updatedAt,
+//       },
+//       posts,
+//       stats,
+//     })
+//   } catch (err) {
+//     console.error("❌ Get profile error:", err)
+//     res.status(500).json({
+//       success: false,
+//       message: "Server error",
+//     })
+//   }
+// })
+
+// // ⭐ GET USER'S FOLLOWERS
+// router.get("/followers/:userId", validateUserId, async (req, res) => {
+//   try {
+//     const { userId } = req.params
+//     console.log(`👥 Getting followers for userId: ${userId}`)
+
+//     const user = await User.findById(userId).populate("followers", "name email profilePicture followersCount bio isVerified")
+
+//     if (!user) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "User not found",
+//       })
+//     }
+
+//     res.json({
+//       success: true,
+//       followers: user.followers || [],
+//       count: user.followersCount || 0,
+//     })
+//   } catch (error) {
+//     console.error("❌ Get followers error:", error)
+//     res.status(500).json({
+//       success: false,
+//       message: "Server error",
+//     })
+//   }
+// })
+
+// // ⭐ GET USER'S FOLLOWING
+// router.get("/following/:userId", validateUserId, async (req, res) => {
+//   try {
+//     const { userId } = req.params
+//     console.log(`👥 Getting following for userId: ${userId}`)
+
+//     const user = await User.findById(userId).populate("following", "name email profilePicture followersCount bio isVerified")
+
+//     if (!user) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "User not found",
+//       })
+//     }
+
+//     res.json({
+//       success: true,
+//       following: user.following || [],
+//       count: user.followingCount || 0,
+//     })
+//   } catch (error) {
+//     console.error("❌ Get following error:", error)
+//     res.status(500).json({
+//       success: false,
+//       message: "Server error",
+//     })
+//   }
+// })
+
+// // ✅ UPDATE USER PROFILE - COMPLETE WITH BIO AND PRIVACY
+// router.put("/profile/:userId", validateUserId, async (req, res) => {
+//   try {
+//     const { userId } = req.params
+//     const { name, email, profilePicture, bio, isPrivate } = req.body // ✅ isPrivate added
+
+//     console.log(`🔄 Updating profile for userId: ${userId}`)
+//     console.log('Update data:', { name, email, bio, isPrivate }) // ✅ Debug log
+
+//     // Validation
+//     if (!name) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Name is required",
+//       })
+//     }
+
+//     // ✅ Bio validation
+//     if (bio && bio.length > 150) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Bio must be 150 characters or less",
+//       })
+//     }
+
+//     // Check if email is already taken by another user (if email is being updated)
+//     if (email) {
+//       const emailExists = await User.findOne({
+//         email: email.trim(),
+//         _id: { $ne: userId },
+//       })
+
+//       if (emailExists) {
+//         return res.status(400).json({
+//           success: false,
+//           message: "Email already exists",
+//         })
+//       }
+//     }
+
+//     // ✅ Build update data object
+//     const updateData = {
+//       name: name.trim(),
+//     }
+
+//     // Only update email if provided
+//     if (email) updateData.email = email.trim()
+    
+//     // Only update profile picture if provided
+//     if (profilePicture) updateData.profilePicture = profilePicture
+    
+//     // ✅ Update bio (can be empty string)
+//     if (bio !== undefined) updateData.bio = bio.trim()
+    
+//     // ✅ Update privacy setting
+//     if (isPrivate !== undefined) updateData.isPrivate = isPrivate
+
+//     console.log('Final update data:', updateData) // ✅ Debug log
+
+//     const updatedUser = await User.findByIdAndUpdate(
+//       userId, 
+//       updateData, 
+//       { new: true, runValidators: true }
+//     ).select("-password")
+
+//     if (!updatedUser) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "User not found",
+//       })
+//     }
+
+//     console.log(`✅ Profile updated successfully`)
+
+//     res.json({
+//       success: true,
+//       message: "Profile updated successfully",
+//       user: {
+//         _id: updatedUser._id,
+//         name: updatedUser.name,
+//         email: updatedUser.email,
+//         profilePicture: updatedUser.profilePicture || "",
+//         bio: updatedUser.bio || "", // ✅ Bio return
+//         isPrivate: updatedUser.isPrivate || false, // ✅ Privacy return
+//         isVerified: updatedUser.isVerified || false, // ✅ Verification return
+//         followersCount: updatedUser.followersCount || 0,
+//         followingCount: updatedUser.followingCount || 0,
+//         createdAt: updatedUser.createdAt,
+//         updatedAt: updatedUser.updatedAt,
+//       },
+//     })
+
+//   } catch (err) {
+//     console.error("❌ Update profile error:", err)
+//     res.status(500).json({
+//       success: false,
+//       message: "Server error",
+//       error: err.message,
+//     })
+//   }
+// })
+
+// // ✅ Change Password
+// router.put("/change-password/:userId", validateUserId, async (req, res) => {
+//   try {
+//     const { userId } = req.params
+//     const { currentPassword, newPassword } = req.body
+
+//     console.log(`🔐 Password change request for userId: ${userId}`)
+
+//     if (!currentPassword || !newPassword) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Both passwords are required",
+//       })
+//     }
+
+//     if (newPassword.length < 6) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "New password must be at least 6 characters",
+//       })
+//     }
+
+//     const user = await User.findById(userId)
+
+//     if (!user) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "User not found",
+//       })
+//     }
+
+//     const isMatch = await bcrypt.compare(currentPassword, user.password)
+
+//     if (!isMatch) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Current password is incorrect",
+//       })
+//     }
+
+//     const hashedPassword = await bcrypt.hash(newPassword, 12)
+
+//     await User.findByIdAndUpdate(userId, { password: hashedPassword })
+
+//     console.log(`✅ Password changed successfully`)
+
+//     res.json({
+//       success: true,
+//       message: "Password changed successfully",
+//     })
+
+//   } catch (err) {
+//     console.error("❌ Password change error:", err)
+//     res.status(500).json({
+//       success: false,
+//       message: "Server error",
+//     })
+//   }
+// })
+
+// // ✅ Update Profile Picture
+// router.put("/profile-picture/:userId", validateUserId, async (req, res) => {
+//   try {
+//     const { userId } = req.params
+//     const { profilePicture } = req.body
+
+//     console.log(`🖼️ Updating profile picture for userId: ${userId}`)
+
+//     if (!profilePicture) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Profile picture URL is required",
+//       })
+//     }
+
+//     const updatedUser = await User.findByIdAndUpdate(
+//       userId, 
+//       { profilePicture }, 
+//       { new: true }
+//     ).select("-password")
+
+//     if (!updatedUser) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "User not found",
+//       })
+//     }
+
+//     console.log(`✅ Profile picture updated`)
+
+//     res.json({
+//       success: true,
+//       message: "Profile picture updated successfully",
+//       user: {
+//         _id: updatedUser._id,
+//         name: updatedUser.name,
+//         email: updatedUser.email,
+//         profilePicture: updatedUser.profilePicture || "",
+//         bio: updatedUser.bio || "",
+//         isPrivate: updatedUser.isPrivate || false,
+//         isVerified: updatedUser.isVerified || false,
+//         createdAt: updatedUser.createdAt,
+//         updatedAt: updatedUser.updatedAt,
+//       },
+//     })
+
+//   } catch (err) {
+//     console.error("❌ Update profile picture error:", err)
+//     res.status(500).json({
+//       success: false,
+//       message: "Server error",
+//     })
+//   }
+// })
+
+// // Get user's groups
+// router.get("/:userId/groups", validateUserId, async (req, res) => {
+//   try {
+//     const { userId } = req.params
+
+//     const user = await User.findById(userId).populate("groups")
+
+//     if (!user) {
+//       return res.status(404).json({ success: false, message: "User not found" })
+//     }
+
+//     res.json({ 
+//       success: true,
+//       groups: user.groups || [],
+//       count: user.groups?.length || 0
+//     })
+//   } catch (error) {
+//     console.error("❌ Error fetching user groups:", error)
+//     res.status(500).json({ success: false, message: "Server error" })
+//   }
+// })
+
+// // ✅ FCM Token endpoint - REQUIRED FOR NOTIFICATIONS
+// router.post("/fcm-token", async (req, res) => {
+//   const { userId, fcmToken } = req.body
+
+//   try {
+//     console.log(`💾 Saving FCM token for user: ${userId}`)
+
+//     if (!userId || !fcmToken) {
+//       return res.status(400).json({ success: false, message: "userId and fcmToken required" })
+//     }
+
+//     if (!mongoose.Types.ObjectId.isValid(userId)) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Invalid user ID format'
+//       })
+//     }
+
+//     const updatedUser = await User.findByIdAndUpdate(userId, { fcmToken }, { new: true })
+
+//     if (!updatedUser) {
+//       console.log(`❌ User not found: ${userId}`)
+//       return res.status(404).json({ success: false, message: "User not found" })
+//     }
+
+//     console.log(`✅ FCM token saved for user: ${updatedUser.name}`)
+
+//     res.json({ 
+//       success: true,
+//       message: "FCM token saved successfully"
+//     })
+//   } catch (err) {
+//     console.error("❌ Error saving FCM token:", err)
+//     res.status(500).json({ success: false, message: "Error saving FCM token" })
+//   }
+// })
+
+// // ✅ Join Group endpoint - REQUIRED FOR NOTIFICATIONS
+// router.post("/join-group", async (req, res) => {
+//   const { userId, groupId } = req.body
+
+//   try {
+//     console.log(`👥 Adding user ${userId} to group ${groupId}`)
+
+//     if (!userId || !groupId) {
+//       return res.status(400).json({ success: false, message: "userId and groupId required" })
+//     }
+
+//     if (!mongoose.Types.ObjectId.isValid(userId)) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Invalid user ID format'
+//       })
+//     }
+
+//     // Add group to user's groups array
+//     const updatedUser = await User.findByIdAndUpdate(userId, { $addToSet: { groups: groupId } }, { new: true })
+
+//     if (!updatedUser) {
+//       return res.status(404).json({ success: false, message: "User not found" })
+//     }
+
+//     console.log(`✅ User ${updatedUser.name} added to group`)
+
+//     res.json({ 
+//       success: true,
+//       message: "Successfully joined group"
+//     })
+//   } catch (err) {
+//     console.error("❌ Error joining group:", err)
+//     res.status(500).json({ success: false, message: "Error joining group" })
+//   }
+// })
+
+//   module.exports = router
+
+
+
+
+
+
+
+
 const express = require("express")
 const User = require("../models/user")
 const Post = require("../models/post")
@@ -2111,4 +2746,110 @@ router.post("/join-group", async (req, res) => {
   }
 })
 
+
+router.put('/save/:courseId', async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    const { userId } = req.body;
+
+    // Validation
+    if (!userId || !courseId) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "User ID and Course ID are required" 
+      });
+    }
+
+    // Check if course exists
+    const course = await Course.findById(courseId);
+    if (!course) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Course not found" 
+      });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "User not found" 
+      });
+    }
+
+    // Check if course is already saved
+    const isSaved = user.savedCourses.includes(courseId);
+    
+    if (isSaved) {
+      // Remove from saved
+      user.savedCourses.pull(courseId);
+      await user.save();
+      return res.json({ 
+        success: true, 
+        isSaved: false,
+        message: "Course removed from saved list"
+      });
+    } else {
+      // Add to saved
+      user.savedCourses.push(courseId);
+      await user.save();
+      return res.json({ 
+        success: true, 
+        isSaved: true,
+        message: "Course saved successfully"
+      });
+    }
+
+  } catch (error) {
+    console.error("Save course error:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Failed to save course" 
+    });
+  }
+});
+
+
+
+
+router.get('/saved-courses/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const user = await User.findById(userId).populate({
+      path: 'savedCourses',
+      select: 'title thumbnailUrl instructorName duration views',
+      options: { sort: { createdAt: -1 } }
+    });
+
+    if (!user) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "User not found" 
+      });
+    }
+
+    res.json({ 
+      success: true, 
+      savedCourses: user.savedCourses 
+    });
+
+  } catch (error) {
+    console.error("Get saved courses error:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Failed to get saved courses" 
+    });
+  }
+});
+
+
+
   module.exports = router
+
+
+
+
+
+
+
