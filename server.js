@@ -1,4 +1,3 @@
-
 const express = require("express")
 const http = require("http")
 const { Server } = require("socket.io")
@@ -6,47 +5,6 @@ const mongoose = require("mongoose")
 const cors = require("cors")
 require("dotenv").config()
 
-// ✅ FIXED: Firebase Admin SDK Configuration
-// let admin
-// try {
-//   admin = require("firebase-admin")
-//   // Check if Firebase is already initialized
-//   if (!admin.apps.length) {
-//     // Try to use environment variables first (recommended for production)
-//     if (process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PROJECT_ID) {
-//       console.log("🔥 Initializing Firebase with environment variables...")
-//       admin.initializeApp({
-//         credential: admin.credential.cert({
-//           type: "service_account",
-//           project_id: process.env.FIREBASE_PROJECT_ID,
-//           private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
-//           private_key: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n"),
-//           client_email: process.env.FIREBASE_CLIENT_EMAIL,
-//           client_id: process.env.FIREBASE_CLIENT_ID,
-//           auth_uri: "https://accounts.google.com/o/oauth2/auth",
-//           token_uri: "https://oauth2.googleapis.com/token",
-//           auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
-//           client_x509_cert_url: `https://www.googleapis.com/robot/v1/metadata/x509/${process.env.FIREBASE_CLIENT_EMAIL}`,
-//         }),
-//       })
-//       console.log("✅ Firebase initialized with environment variables")
-//     } else {
-//       // Fallback to service account file (for development)
-//       console.log("🔥 Initializing Firebase with service account file...")
-//       const serviceAccount = require("./firebase-service-account.json") // Rename your file
-//       admin.initializeApp({
-//         credential: admin.credential.cert(serviceAccount),
-//       })
-//       console.log("✅ Firebase initialized with service account file")
-//     }
-//   } else {
-//     console.log("🔥 Firebase already initialized")
-//   }
-// } catch (error) {
-//   console.error("❌ Firebase initialization error:", error.message)
-//   console.log("⚠️ Continuing without Firebase (notifications will not work)")
-//   admin = null
-// }
 
 const app = express()
 
@@ -1477,137 +1435,89 @@ mongoose
     console.log("🤝 Setting up Connection routes...")
 
     // Send connection request
-    app.post("/api/connections/request", async (req, res) => {
-      try {
-        const { senderId, receiverId } = req.body
+// Send connection request
+app.post("/api/connections/request", async (req, res) => {
+  try {
+    const { senderId, receiverId } = req.body
 
-        if (!senderId || !receiverId) {
-          return res.status(400).json({ success: false, message: "Sender and receiver IDs are required." })
-        }
+    if (!senderId || !receiverId) {
+      return res.status(400).json({ success: false, message: "Sender and receiver IDs are required." })
+    }
 
-        if (senderId === receiverId) {
-          return res.status(400).json({ success: false, message: "Cannot send a connection request to yourself." })
-        }
+    if (senderId === receiverId) {
+      return res.status(400).json({ success: false, message: "Cannot send a connection request to yourself." })
+    }
 
-        const existingRequest = await ConnectionRequest.findOne({
-          $or: [
-            { sender: senderId, receiver: receiverId },
-            { sender: receiverId, receiver: senderId, status: "accepted" },
-          ],
-        })
+    const existingRequest = await ConnectionRequest.findOne({
+      $or: [
+        { sender: senderId, receiver: receiverId },
+        { sender: receiverId, receiver: senderId, status: "accepted" },
+      ],
+    })
 
-        if (existingRequest) {
-          if (existingRequest.status === "pending") {
-            return res.status(409).json({ success: false, message: "Connection request already sent." })
-          } else if (existingRequest.status === "accepted") {
-            return res.status(409).json({ success: false, message: "Already connected with this user." })
-          }
-        }
+    if (existingRequest) {
+      if (existingRequest.status === "pending") {
+        return res.status(409).json({ success: false, message: "Connection request already sent." })
+      } else if (existingRequest.status === "accepted") {
+        return res.status(409).json({ success: false, message: "Already connected with this user." })
+      }
+    }
 
-        const newRequest = new ConnectionRequest({ sender: senderId, receiver: receiverId })
-        await newRequest.save()
+    const newRequest = new ConnectionRequest({ sender: senderId, receiver: receiverId })
+    await newRequest.save()
 
-        // ✅ FIXED: Safe notification sending
-        if (admin) {
-          try {
-            const receiverUser = await User.findById(receiverId).select("fcmToken name")
-            if (receiverUser && receiverUser.fcmToken) {
-              const senderUser = await User.findById(senderId).select("name")
-              await admin.messaging().send({
-                token: receiverUser.fcmToken,
-                notification: {
-                  title: "New Connection Request! 🤝",
-                  body: `${senderUser?.name || "Someone"} wants to connect with you.`,
-                },
-                data: {
-                  type: "connection_request",
-                  senderId: senderId,
-                  requestId: newRequest._id.toString(),
-                },
-              })
-            }
-          } catch (notificationError) {
-            console.error("❌ Notification error:", notificationError)
-            // Don't fail the request if notification fails
-          }
-        }
-
-        console.log("✅ Connection request sent")
-        res.status(201).json({ success: true, message: "Connection request sent.", request: newRequest })
-      } catch (error) {
-        console.error("❌ Error sending connection request:", error)
-        res.status(500).json({ success: false, message: "Failed to send connection request.", error: error.message })
-      }
-    })
+    console.log("✅ Connection request sent")
+    res.status(201).json({ success: true, message: "Connection request sent.", request: newRequest })
+  } catch (error) {
+    console.error("❌ Error sending connection request:", error)
+    res.status(500).json({ success: false, message: "Failed to send connection request.", error: error.message })
+  }
+})
 
     // Accept connection request
-    app.put("/api/connections/accept/:requestId", async (req, res) => {
-      try {
-        const { requestId } = req.params
-        const { userId } = req.body
-        console.log(`✅ Accepting connection request: ${requestId} by user: ${userId}`)
+   // Accept connection request
+app.put("/api/connections/accept/:requestId", async (req, res) => {
+  try {
+    const { requestId } = req.params
+    const { userId } = req.body
+    console.log(`✅ Accepting connection request: ${requestId} by user: ${userId}`)
 
-        const request = await ConnectionRequest.findById(requestId)
-        if (!request) {
-          return res.status(404).json({ success: false, message: "Connection request not found." })
-        }
+    const request = await ConnectionRequest.findById(requestId)
+    if (!request) {
+      return res.status(404).json({ success: false, message: "Connection request not found." })
+    }
 
-        if (request.receiver.toString() !== userId) {
-          return res.status(403).json({ success: false, message: "You are not authorized to accept this request." })
-        }
+    if (request.receiver.toString() !== userId) {
+      return res.status(403).json({ success: false, message: "You are not authorized to accept this request." })
+    }
 
-        if (request.status !== "pending") {
-          return res.status(409).json({ success: false, message: "Request is not pending." })
-        }
+    if (request.status !== "pending") {
+      return res.status(409).json({ success: false, message: "Request is not pending." })
+    }
 
-        request.status = "accepted"
-        await request.save()
+    request.status = "accepted"
+    await request.save()
 
-        await User.findByIdAndUpdate(request.sender, { $addToSet: { connections: request.receiver } })
-        await User.findByIdAndUpdate(request.receiver, { $addToSet: { connections: request.sender } })
+    await User.findByIdAndUpdate(request.sender, { $addToSet: { connections: request.receiver } })
+    await User.findByIdAndUpdate(request.receiver, { $addToSet: { connections: request.sender } })
 
-        let chat = await PrivateChat.findOne({
-          participants: { $all: [request.sender, request.receiver] },
-        })
+    let chat = await PrivateChat.findOne({
+      participants: { $all: [request.sender, request.receiver] },
+    })
 
-        if (!chat) {
-          chat = new PrivateChat({ participants: [request.sender, request.receiver] })
-          await chat.save()
-          console.log("✅ Private chat created successfully")
-        }
+    if (!chat) {
+      chat = new PrivateChat({ participants: [request.sender, request.receiver] })
+      await chat.save()
+      console.log("✅ Private chat created successfully")
+    }
 
-        // ✅ FIXED: Safe notification sending
-        if (admin) {
-          try {
-            const senderUser = await User.findById(request.sender).select("fcmToken name")
-            if (senderUser && senderUser.fcmToken) {
-              const receiverUser = await User.findById(request.receiver).select("name")
-              await admin.messaging().send({
-                token: senderUser.fcmToken,
-                notification: {
-                  title: "Connection Accepted! 🎉",
-                  body: `${receiverUser?.name || "Someone"} accepted your connection request.`,
-                },
-                data: {
-                  type: "connection_accepted",
-                  receiverId: request.receiver.toString(),
-                  chatId: chat._id.toString(),
-                },
-              })
-            }
-          } catch (notificationError) {
-            console.error("❌ Notification error:", notificationError)
-            // Don't fail the request if notification fails
-          }
-        }
-
-        console.log("✅ Connection request accepted successfully")
-        res.status(200).json({ success: true, message: "Connection request accepted.", request })
-      } catch (error) {
-        console.error("❌ Error accepting connection request:", error)
-        res.status(500).json({ success: false, message: "Failed to accept connection request.", error: error.message })
-      }
-    })
+    console.log("✅ Connection request accepted successfully")
+    res.status(200).json({ success: true, message: "Connection request accepted.", request })
+  } catch (error) {
+    console.error("❌ Error accepting connection request:", error)
+    res.status(500).json({ success: false, message: "Failed to accept connection request.", error: error.message })
+  }
+})
 
     // Reject connection request
     app.put("/api/connections/reject/:requestId", async (req, res) => {
